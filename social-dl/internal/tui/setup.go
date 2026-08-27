@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -22,6 +24,7 @@ type setupModel struct {
 	err         error
 	paths       deps.Paths
 	status      deps.Status
+	updateOnly  bool
 }
 
 func newSetupModel(paths deps.Paths, status deps.Status) setupModel {
@@ -45,6 +48,7 @@ func newSetupModel(paths deps.Paths, status deps.Status) setupModel {
 		paths:      paths,
 		status:     status,
 		totalFiles: total,
+		updateOnly: !status.NeedsSetup(),
 	}
 }
 
@@ -56,6 +60,13 @@ func (m setupModel) startDownload() tea.Cmd {
 	paths := m.paths
 	status := m.status
 	return func() tea.Msg {
+		if m.updateOnly {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			_, _ = deps.MaybeUpdateYtDlp(ctx, paths.YtDlp)
+			return setupDoneMsg{paths: paths}
+		}
+
 		items, err := deps.PendingDownloads(paths, status)
 		if err != nil {
 			return setupErrMsg{err: err}
@@ -65,6 +76,15 @@ func (m setupModel) startDownload() tea.Cmd {
 				return setupErrMsg{err: fmt.Errorf("download %s: %w", item.Name, err)}
 			}
 			os.Chmod(item.Dest, 0755)
+		}
+
+		// If yt-dlp was already installed, refresh it after completing any
+		// missing dependency setup. A newly downloaded yt-dlp is already the
+		// latest release and does not need a second network request.
+		if !status.NeedYtDlp {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			_, _ = deps.MaybeUpdateYtDlp(ctx, paths.YtDlp)
 		}
 		return setupDoneMsg{paths: paths}
 	}
@@ -96,9 +116,22 @@ func (m setupModel) View() string {
 		)
 	}
 	if m.done {
+		if m.updateOnly {
+			return boxStyle.Render(
+				successStyle.Render("OK yt-dlp da san sang!") + "\n" +
+					mutedStyle.Render("Dang khoi dong..."),
+			)
+		}
 		return boxStyle.Render(
 			successStyle.Render("OK Setup hoan tat!") + "\n" +
 				mutedStyle.Render("Dang khoi dong..."),
+		)
+	}
+	if m.updateOnly {
+		return boxStyle.Render(
+			titleStyle.Render("Kiem tra cap nhat") + "\n\n" +
+				m.spinner.View() + " Dang kiem tra yt-dlp...\n\n" +
+				mutedStyle.Render("Se kiem tra lai toi da moi 24 gio."),
 		)
 	}
 	return boxStyle.Render(

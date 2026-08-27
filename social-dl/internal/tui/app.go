@@ -76,13 +76,10 @@ func NewApp(version string) (*App, error) {
 		appSettings: s,
 	}
 
-	if app.needsSetup {
-		app.state = viewSetup
-		app.setup = newSetupModel(paths, status)
-	} else {
-		app.state = viewHome
-		app.home = newHomeModel(version, s)
-	}
+	// Always pass through the setup screen. On existing installs this is a
+	// quick, throttled yt-dlp update check; on first run it downloads deps.
+	app.state = viewSetup
+	app.setup = newSetupModel(paths, status)
 
 	return app, nil
 }
@@ -665,4 +662,3 @@ func (a App) scanProfile(url string) tea.Cmd {
 		return profileScanMsg{entries: entries, err: err}
 	}
 }
-

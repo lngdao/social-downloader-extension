@@ -40,7 +40,9 @@ chmod +x social-dl-*
 ./social-dl-macos-apple-silicon
 ```
 
-First run auto-downloads yt-dlp + ffmpeg (~90MB). After that, launches instantly.
+First run auto-downloads yt-dlp + ffmpeg (~90MB). On later launches, yt-dlp is
+checked and updated automatically at most once every 24 hours. If the update
+cannot be completed, the existing yt-dlp binary is kept and the app continues.
 
 ### Features
 
